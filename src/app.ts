@@ -87,49 +87,75 @@ export class Table extends Phaser.Scene {
   firstDraw() {
     this.controls.Deal.disableInteractive()
     this.controls.Stand.disableInteractive()
-    this.drawPlayer()
-      .then(() => this.drawDealer())
-      .then(() => this.drawPlayer(-50))
+    this.drawPlayer(-50)
       .then(() => this.drawDealer(-50))
+      .then(() => this.drawPlayer())
+      .then(() => this.drawDealer())
       .then(() => {
         const score = this.checkScore()
         if (score < 0) {
           this.dealerWin()
         } else if (score === 21) {
           this.playerWin()
-        } else {
-          this.drawDealer(offset)
         }
       })
   }
 
   onStand() {
-    const dealersSum = this.sumCards(this.dealersCards)
+    if (this.drawnCards.length < 4) {
+      return
+    }
+
+    let dealersSum = this.sumCards(this.dealersCards)
     const canDealerDraw = dealersSum < 17
     const playerSum = this.sumCards(this.playerCards)
+    this.checkScore()
 
-    if (playerSum <= 21 && !canDealerDraw) {
+    if (playerSum <= 21 && playerSum > dealersSum && !canDealerDraw) {
       this.playerWin()
     } else if (canDealerDraw) {
-      console.log('dealer draws')
+      this.drawDealer(50)
+        .then(() => {
+          this.onStand()
+        })
+    } else if (dealersSum <= 21 && dealersSum > playerSum) {
+      this.dealerWin()
+    } else if (dealersSum === playerSum) {
+      this.noWinner()
+    } else {
+      this.playerWin()
     }
   }
 
   playerWin() {
     var title = this.add.text(100, 200, 'PLAYER WINS', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
+    this.disableInteractive(values(this.controls))
     console.log('PLAYER WINS')
   }
 
   dealerWin() {
     var title = this.add.text(100, 200, 'DEALER WINS', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
+    this.disableInteractive(values(this.controls))
     console.log('DEALER WINS')
+  }
+
+  noWinner() {
+    var title = this.add.text(100, 200, 'DRAW', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
+    this.disableInteractive(values(this.controls))
+    console.log('DRAW, NO WINNER')
+  }
+
+  cardToTop(card) {
+    this.children.bringToTop(card)
   }
 
   drawPlayer(offset = 0) {
     return new Promise((resolve, reject) => {
       const { deck } = this
       const currentCard = this.getCardSprite(this.getNextCardName(deck))
+      this.cardToTop(currentCard)
       const backCard = this.getCardSprite('back')
+      this.cardToTop(backCard)
       this.drawnCards.push(currentCard.name)
       this.playerCards.push(currentCard.name)
       this.tweens.add({
@@ -150,7 +176,9 @@ export class Table extends Phaser.Scene {
     return new Promise((resolve, reject) => {
       const { deck } = this
       const currentCard = this.getCardSprite(this.getNextCardName(deck))
+      this.cardToTop(currentCard)
       const backCard = this.getCardSprite('back')
+      this.cardToTop(backCard)
       if (this.dealersCards.length === 0) {
         currentCard.setTexture('cards', 'back')
       }
@@ -170,48 +198,6 @@ export class Table extends Phaser.Scene {
     })
   }
 
-  singleDraw(offset = 0, hideDealers = true, canDealerDraw = true) {
-    this.controls.Deal.disableInteractive()
-    const { deck } = this
-    const currentCard = this.getCardSprite(this.getNextCardName(deck))
-    const backCard = this.getCardSprite('back')
-    this.drawnCards.push(currentCard.name)
-    this.playerCards.push(currentCard.name)
-    const nextCard = this.getCardSprite(this.getNextCardName(deck))
-    this.drawnCards.push(nextCard.name)
-    this.dealersCards.push(nextCard.name)
-    this.tweens.add({
-      targets: currentCard,
-      x: { value: 300 + offset, duration: 1500, ease: 'Power2' },
-      y: { value: 250, duration: 500, ease: 'Bounce.easeOut', delay: 150 },
-      onComplete: () => {
-        if (hideDealers) {
-          nextCard.setTexture('cards', 'back')
-        }
-        if (canDealerDraw) {
-          this.tweens.add({
-            targets: nextCard,
-            x: { value: 300 + offset, duration: 1500, ease: 'Power2' },
-            y: { value: 50, duration: 500, ease: 'Bounce.easeOut', delay: 150 },
-            onComplete:() =>  this.checkScore()
-          });
-          this.tweens.add({
-            targets: backCard,
-            x: { value: nextCard.x, duration: 1500, ease: 'Power2' },
-            y: { value: nextCard.y, duration: 500, ease: 'Bounce.easeOut', delay: 150 }
-          });
-        } else {
-          this.checkScore()
-        }
-      }
-    });
-    this.tweens.add({
-      targets: backCard,
-      x: { value: currentCard.x, duration: 1500, ease: 'Power2' },
-      y: { value: currentCard.y, duration: 500, ease: 'Bounce.easeOut', delay: 150 }
-    });
-  }
-
   getNextCardName(deck) {
     return first(deck.filter(card => !includes(this.drawnCards, card)))
   }
@@ -219,23 +205,16 @@ export class Table extends Phaser.Scene {
   hitMe() {
     this.controls.Deal.disableInteractive()
     this.controls.Stand.disableInteractive()
-    const offset = (150 + 50 * (this.playerCards.length - 2))
+    const offset = (50 + 50 * (this.playerCards.length - 2))
     this.drawPlayer(offset)
       .then(() => {
         const score = this.checkScore()
         if (score < 0) {
           this.dealerWin()
-        } else if (score === 21) {
-          this.playerWin()
         } else {
-          this.drawDealer(offset)
+          this.onStand()
         }
       })
-    // const dealersSum = this.sumCards(this.dealersCards)
-    // const canDealerDraw = dealersSum < 17
-    // const playerSum = this.sumCards(this.playerCards)
-    // console.log(dealersSum, playerSum)
-    // this.singleDraw((150 + 50 * (this.playerCards.length - 2)), false, canDealerDraw)
   }
 
   sumCards(cards) {
@@ -248,7 +227,7 @@ export class Table extends Phaser.Scene {
     console.log('checkScore', dealersSum, playerSum)
 
     if (this.drawnCards.length > 3 && playerSum > 21 && dealersSum <= 21) {
-      if (!this.hasAce()) {
+      if (!this.hasAce(this.playerCards)) {
         return -1
       }
       playerSum -= 10
@@ -259,16 +238,18 @@ export class Table extends Phaser.Scene {
 
     this.controls.Deal.setInteractive()
     this.controls.Stand.setInteractive()
+
     return 0
   }
 
   checkFor21() {
     const playerSum = this.sumCards(this.playerCards)
+
     return playerSum === 21
   }
 
-  hasAce() {
-    return find(this.playerCards, c => includes(c, 'Ace'))
+  hasAce(cards) {
+    return find(cards, c => includes(c, 'Ace'))
   }
 
   cardValue(card) {
@@ -286,7 +267,7 @@ export class Table extends Phaser.Scene {
     return shuffle(cards)
   }
 
-  getCardSprite(name): Phaser.GameObjects.GameObject {
+  getCardSprite(name): any {
     return find(this.children.list, child => child.name === name)
   }
 
@@ -296,6 +277,14 @@ export class Table extends Phaser.Scene {
     }
 
     gameObjects.forEach(o => o.setInteractive())
+  }
+
+  disableInteractive(gameObjects: Phaser.GameObjects.GameObject[]|Phaser.GameObjects.GameObject) {
+    if (!isArray(gameObjects)) {
+      gameObjects = [gameObjects]
+    }
+
+    gameObjects.forEach(o => o.disableInteractive())
   }
 
   setDraggable(gameObjects: Phaser.GameObjects.GameObject[]|Phaser.GameObjects.GameObject) {
