@@ -61,7 +61,6 @@ export class Table extends Phaser.Scene {
     })
     this.input.on('pointerover', function(pointer, gameObjects: any[]) {
       gameObjects.forEach(o => {
-        console.log(o.text)
         if (o.text === 'Stand' || o.text === 'Deal' || o.text === 'Shuffle') {
           o.setAlpha(1)
         }
@@ -228,10 +227,22 @@ export class Table extends Phaser.Scene {
 
     console.log('checkScore', dealersSum, playerSum)
 
-    if (dealerHasBlackjack && playerHasBlackjack) {
+    const dealerRevealOnWin = () => {
+      const cardName = first(this.dealersCards)
+      const dealerBackCard = this.getCardSprite(cardName)
+      this.tweens.add({
+        targets: dealerBackCard,
+        x: { value: dealerBackCard.x + 50, duration: 500, ease: 'Power1', delay: 1 },
+        yoyo: true,
+        onYoyo: () => dealerBackCard.setTexture('cards', cardName),
+        onComplete: () => this.dealerWin()
+      });
+    }
+
+    if (dealerHasBlackjack && playerHasBlackjack || (playerSum === dealersSum && !canDealerDraw && this.playerStands)) {
       this.noWinner()
     } else if (dealerHasBlackjack && !playerHasBlackjack) {
-      this.dealerWin()
+      dealerRevealOnWin()
     } else if (playerHasBlackjack) {
       this.playerWin()
     } else if (!firstDraw && canDealerDraw && (this.playerStands || (playerDrawnLast && !playerOver))) {
@@ -245,13 +256,13 @@ export class Table extends Phaser.Scene {
       this.drawDealer((50 + 50 * (this.dealersCards.length - 2)))
         .then(() => this.checkScore())
     } else if (playerOver) {
-      this.dealerWin()
+      dealerRevealOnWin()
     } else if (this.playerStands && !playerOver && playerSum > dealersSum) {
       this.playerWin()
-    } else if (this.playerStands && !playerOver && dealersSum > playerSum) {
-      this.dealerWin()
+    } else if (this.playerStands && !playerOver && dealersSum > playerSum && !dealerOver) {
+      dealerRevealOnWin()
     } else if (playerOver && !dealerOver) {
-      this.dealerWin()
+      dealerRevealOnWin()
     } else if (!playerOver && dealerOver) {
       this.playerWin()
     } else {
