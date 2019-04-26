@@ -13,6 +13,8 @@ export class Table extends Phaser.Scene {
   public backFace: Phaser.GameObjects.Sprite;
   public playerStands: boolean = false
   public endState: boolean = false
+  public winCount: number = 0
+  public loseCount: number = 0
   public controls: { Deal: Phaser.GameObjects.Text , Stand: Phaser.GameObjects.Text } = {
     Deal: null,
     Stand: null
@@ -34,12 +36,22 @@ export class Table extends Phaser.Scene {
     let x = 0;
     let y = 0;
     this.deck.forEach(card => {
-      this.add.sprite(x, y, 'cards', card).setOrigin(0).setName(card)
+      const cardSprite = this.add.sprite(0, 0, 'cards', card).setOrigin(0).setName(card)
+      this.tweens.add({
+        targets: cardSprite,
+        x: { value: x, duration: 600, ease: 'Power2' },
+        y: { value: y, duration: 600, ease: 'Power2', },
+      });
       x += 0.2
       y += 3
     })
     this.deck = reverse(this.deck)
-    this.add.sprite(x, y, 'cards', 'back').setOrigin(0).setName('back')
+    const backSprite = this.add.sprite(0, 0, 'cards', 'back').setOrigin(0).setName('back')
+    this.tweens.add({
+      targets: backSprite,
+      x: { value: x, duration: 600, ease: 'Power2' },
+      y: { value: y, duration: 600, ease: 'Power2', },
+    });
     this.controls.Deal = this.add.text(75, 500, 'Deal')
       .setOrigin(0).setFontSize(54).setFontStyle('bold italic')
       .setFontFamily('Arial').setBackgroundColor('#fab433')
@@ -75,6 +87,13 @@ export class Table extends Phaser.Scene {
     })
     this.controls.Deal.on('pointerdown', () => this.onDeal())
     this.controls.Stand.on('pointerdown', () => this.onStand())
+    this.add.text(WIDTH - 120, 20, '', {
+      fontSize: '20px',
+      fill: '#ffffff'
+    }).setText([
+      `Wins:  ${this.winCount}`,
+      `Loses: ${this.loseCount}`
+    ]);
     console.log(this)
   }
 
@@ -108,12 +127,14 @@ export class Table extends Phaser.Scene {
 
   playerWin() {
     var title = this.add.text(225, 445, 'PLAYER WINS', { fontFamily: 'Arial', fontSize: 44, color: '#00ff00' });
+    this.winCount++
     this.setEndState()
     console.log('PLAYER WINS')
   }
 
   dealerWin() {
     var title = this.add.text(225, 445, 'DEALER WINS', { fontFamily: 'Arial', fontSize: 44, color: '#00ff00' });
+    this.loseCount++
     this.setEndState()
     console.log('DEALER WINS')
   }
@@ -227,7 +248,7 @@ export class Table extends Phaser.Scene {
 
     console.log('checkScore', dealersSum, playerSum)
 
-    const dealerRevealOnWin = () => {
+    const dealerReveal = (callback) => {
       const cardName = first(this.dealersCards)
       const dealerBackCard = this.getCardSprite(cardName)
       this.tweens.add({
@@ -235,14 +256,14 @@ export class Table extends Phaser.Scene {
         x: { value: dealerBackCard.x + 50, duration: 500, ease: 'Power1', delay: 1 },
         yoyo: true,
         onYoyo: () => dealerBackCard.setTexture('cards', cardName),
-        onComplete: () => this.dealerWin()
+        onComplete: callback
       });
     }
 
     if (dealerHasBlackjack && playerHasBlackjack || (playerSum === dealersSum && !canDealerDraw && this.playerStands)) {
-      this.noWinner()
+      dealerReveal(() => this.noWinner())
     } else if (dealerHasBlackjack && !playerHasBlackjack) {
-      dealerRevealOnWin()
+      dealerReveal(() => this.dealerWin())
     } else if (playerHasBlackjack) {
       this.playerWin()
     } else if (!firstDraw && canDealerDraw && (this.playerStands || (playerDrawnLast && !playerOver))) {
@@ -251,18 +272,18 @@ export class Table extends Phaser.Scene {
     } else if (playerHas21 && !canDealerDraw && (dealersSum < playerSum || dealerOver)) {
       this.playerWin()
     } else if(playerHas21 && dealerHas21) {
-      this.noWinner()
+      dealerReveal(() => this.noWinner())
     } else if (playerHas21 && canDealerDraw) {
       this.drawDealer((50 + 50 * (this.dealersCards.length - 2)))
         .then(() => this.checkScore())
     } else if (playerOver) {
-      dealerRevealOnWin()
+      dealerReveal(() => this.dealerWin())
     } else if (this.playerStands && !playerOver && playerSum > dealersSum) {
       this.playerWin()
     } else if (this.playerStands && !playerOver && dealersSum > playerSum && !dealerOver) {
-      dealerRevealOnWin()
+      dealerReveal(() => this.dealerWin())
     } else if (playerOver && !dealerOver) {
-      dealerRevealOnWin()
+      dealerReveal(() => this.dealerWin())
     } else if (!playerOver && dealerOver) {
       this.playerWin()
     } else {
