@@ -11,6 +11,7 @@ export class Table extends Phaser.Scene {
   public playerCards: string[] = []
   public dealersCards: string[] = []
   public backFace: Phaser.GameObjects.Sprite;
+  public playerStands: boolean = false
   public controls: { Deal: Phaser.GameObjects.Text , Stand: Phaser.GameObjects.Text } = {
     Deal: null,
     Stand: null
@@ -91,40 +92,12 @@ export class Table extends Phaser.Scene {
       .then(() => this.drawDealer(-50))
       .then(() => this.drawPlayer())
       .then(() => this.drawDealer())
-      .then(() => {
-        const score = this.checkScore()
-        if (score < 0) {
-          this.dealerWin()
-        } else if (score === 21) {
-          this.playerWin()
-        }
-      })
+      .then(() => this.checkScore())
   }
 
   onStand() {
-    if (this.drawnCards.length < 4) {
-      return
-    }
-
-    let dealersSum = this.sumCards(this.dealersCards)
-    const canDealerDraw = dealersSum < 17
-    const playerSum = this.sumCards(this.playerCards)
+    this.playerStands = true
     this.checkScore()
-
-    if (playerSum <= 21 && playerSum > dealersSum && !canDealerDraw) {
-      this.playerWin()
-    } else if (canDealerDraw) {
-      this.drawDealer(50)
-        .then(() => {
-          this.onStand()
-        })
-    } else if (dealersSum <= 21 && dealersSum > playerSum) {
-      this.dealerWin()
-    } else if (dealersSum === playerSum) {
-      this.noWinner()
-    } else {
-      this.playerWin()
-    }
   }
 
   playerWin() {
@@ -207,14 +180,7 @@ export class Table extends Phaser.Scene {
     this.controls.Stand.disableInteractive()
     const offset = (50 + 50 * (this.playerCards.length - 2))
     this.drawPlayer(offset)
-      .then(() => {
-        const score = this.checkScore()
-        if (score < 0) {
-          this.dealerWin()
-        } else {
-          this.onStand()
-        }
-      })
+      .then(() => this.checkScore())
   }
 
   sumCards(cards) {
@@ -222,24 +188,58 @@ export class Table extends Phaser.Scene {
   }
 
   checkScore() {
-    const dealersSum = this.sumCards(this.dealersCards)
+    this.controls.Deal.disableInteractive()
+    this.controls.Stand.disableInteractive()
+    let dealersSum = this.sumCards(this.dealersCards)
     let playerSum = this.sumCards(this.playerCards)
-    console.log('checkScore', dealersSum, playerSum)
-
-    if (this.drawnCards.length > 3 && playerSum > 21 && dealersSum <= 21) {
-      if (!this.hasAce(this.playerCards)) {
-        return -1
-      }
+    if (playerSum > 21 && this.hasAce(this.playerCards)) {
       playerSum -= 10
     }
-    if (this.drawnCards.length > 3 && playerSum === 21) {
-      return 21
+    if (dealersSum > 21 && this.hasAce(this.dealersCards)) {
+      dealersSum -= 10
     }
+    const firstDraw = this.drawnCards.length < 4
+    const canDealerDraw = dealersSum < 17
+    const playerHasBlackjack = playerSum === 21 && this.hasAce(this.playerCards) && this.playerCards.length === 2
+    const dealerHasBlackjack = dealersSum === 21 && this.hasAce(this.drawnCards) && this.dealersCards.length === 2
+    const playerHas21 = this.playerStands && playerSum === 21
+    const dealerHas21 = dealersSum === 21
+    const playerOver = playerSum > 21
+    const dealerOver = dealersSum > 21
+    const playerDrawnLast = this.playerCards.length > this.dealersCards.length
 
-    this.controls.Deal.setInteractive()
-    this.controls.Stand.setInteractive()
+    console.log('checkScore', dealersSum, playerSum)
 
-    return 0
+    if (dealerHasBlackjack && playerHasBlackjack) {
+      this.noWinner()
+    } else if (dealerHasBlackjack && !playerHasBlackjack) {
+      this.dealerWin()
+    } else if (playerHasBlackjack) {
+      this.playerWin()
+    } else if (!firstDraw && canDealerDraw && (this.playerStands || (playerDrawnLast && !playerOver))) {
+      this.drawDealer((50 + 50 * (this.dealersCards.length - 2)))
+        .then(() => this.checkScore())
+    } else if (playerHas21 && !canDealerDraw && (dealersSum < playerSum || dealerOver)) {
+      this.playerWin()
+    } else if(playerHas21 && dealerHas21) {
+      this.noWinner()
+    } else if (playerHas21 && canDealerDraw) {
+      this.drawDealer((50 + 50 * (this.dealersCards.length - 2)))
+        .then(() => this.checkScore())
+    } else if (playerOver) {
+      this.dealerWin()
+    } else if (this.playerStands && !playerOver && playerSum > dealersSum) {
+      this.playerWin()
+    } else if (this.playerStands && !playerOver && dealersSum > playerSum) {
+      this.dealerWin()
+    } else if (playerOver && !dealerOver) {
+      this.dealerWin()
+    } else if (!playerOver && dealerOver) {
+      this.playerWin()
+    } else {
+      this.controls.Deal.setInteractive()
+      this.controls.Stand.setInteractive()
+    }
   }
 
   checkFor21() {
