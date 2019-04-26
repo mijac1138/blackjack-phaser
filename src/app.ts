@@ -12,6 +12,7 @@ export class Table extends Phaser.Scene {
   public dealersCards: string[] = []
   public backFace: Phaser.GameObjects.Sprite;
   public playerStands: boolean = false
+  public endState: boolean = false
   public controls: { Deal: Phaser.GameObjects.Text , Stand: Phaser.GameObjects.Text } = {
     Deal: null,
     Stand: null
@@ -40,12 +41,12 @@ export class Table extends Phaser.Scene {
     this.deck = reverse(this.deck)
     this.add.sprite(x, y, 'cards', 'back').setOrigin(0).setName('back')
     this.controls.Deal = this.add.text(75, 500, 'Deal')
-      .setOrigin(0).setFontSize(64).setFontStyle('bold italic')
+      .setOrigin(0).setFontSize(54).setFontStyle('bold italic')
       .setFontFamily('Arial').setBackgroundColor('#fab433')
       .setPadding(60, 10, 60, 10)
       .setAlpha(0.8)
     this.controls.Stand = this.add.text(400, 500, 'Stand')
-      .setOrigin(0).setFontSize(64).setFontStyle('bold italic')
+      .setOrigin(0).setFontSize(54).setFontStyle('bold italic')
       .setFontFamily('Arial').setBackgroundColor('#fab433')
       .setPadding(60, 10, 60, 10)
       .setAlpha(0.8)
@@ -60,14 +61,15 @@ export class Table extends Phaser.Scene {
     })
     this.input.on('pointerover', function(pointer, gameObjects: any[]) {
       gameObjects.forEach(o => {
-        if (o.text === 'Stand' || o.text === 'Deal') {
+        console.log(o.text)
+        if (o.text === 'Stand' || o.text === 'Deal' || o.text === 'Shuffle') {
           o.setAlpha(1)
         }
       })
     })
     this.input.on('pointerout', function(pointer, gameObjects: any[]) {
       gameObjects.forEach(o => {
-        if (o.text === 'Stand' || o.text === 'Deal') {
+        if (o.text === 'Stand' || o.text === 'Deal' || o.text === 'Shuffle') {
           o.setAlpha(0.8)
         }
       })
@@ -78,7 +80,10 @@ export class Table extends Phaser.Scene {
   }
 
   onDeal(): void {
-    if (this.drawnCards.length < 1) {
+    if (this.endState) {
+      this.endState = false
+      this.scene.restart()
+    } else if (this.drawnCards.length < 1 || this.endState) {
       this.firstDraw()
     } else {
       this.hitMe()
@@ -96,26 +101,39 @@ export class Table extends Phaser.Scene {
   }
 
   onStand() {
-    this.playerStands = true
-    this.checkScore()
+    if (this.drawnCards.length > 3) {
+      this.playerStands = true
+      this.checkScore()
+    }
   }
 
   playerWin() {
-    var title = this.add.text(100, 200, 'PLAYER WINS', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
-    this.disableInteractive(values(this.controls))
+    var title = this.add.text(225, 445, 'PLAYER WINS', { fontFamily: 'Arial', fontSize: 44, color: '#00ff00' });
+    this.setEndState()
     console.log('PLAYER WINS')
   }
 
   dealerWin() {
-    var title = this.add.text(100, 200, 'DEALER WINS', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
-    this.disableInteractive(values(this.controls))
+    var title = this.add.text(225, 445, 'DEALER WINS', { fontFamily: 'Arial', fontSize: 44, color: '#00ff00' });
+    this.setEndState()
     console.log('DEALER WINS')
   }
 
   noWinner() {
-    var title = this.add.text(100, 200, 'DRAW', { fontFamily: 'Arial', fontSize: 64, color: '#00ff00' });
-    this.disableInteractive(values(this.controls))
+    var title = this.add.text(225, 445, 'DRAW', { fontFamily: 'Arial', fontSize: 44, color: '#00ff00' });
+    this.setEndState()
     console.log('DRAW, NO WINNER')
+  }
+
+  setEndState() {
+    this.endState = true
+    this.controls.Deal.setText('Shuffle')
+    this.drawnCards = []
+    this.dealersCards = []
+    this.playerStands = false
+    this.playerCards = []
+    this.setInteractive(this.controls.Deal)
+    this.disableInteractive(this.controls.Stand)
   }
 
   cardToTop(card) {
